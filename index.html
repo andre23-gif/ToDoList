@@ -1221,6 +1221,40 @@ fetch("./api/items.json", {
       zone.textContent = "❌ Erreur : impossible de lire les données serveur.";
     });
 }
+
+// ===== TEST SUPABASE (LECTURE) =====
+function testSupabase(){
+  const zone = document.createElement("div");
+  zone.style.padding = "12px";
+  zone.style.margin = "12px";
+  zone.style.border = "2px solid #2CA768";
+  zone.style.background = "#F4FFF9";
+  zone.style.fontWeight = "bold";
+  zone.textContent = "⏳ Chargement des tâches depuis Supabase…";
+
+  document.body.prepend(zone);
+
+  fetch("https://TON-PROJECT-ID.supabase.co/rest/v1/tasks?select=action,statut", {
+    headers: {
+      "apikey": "TA_CLE_PUBLIQUE",
+      "Authorization": "Bearer TA_CLE_PUBLIQUE"
+    }
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (!Array.isArray(data) || data.length === 0) {
+        zone.textContent = "ℹ️ Aucune tâche dans Supabase.";
+      } else {
+        zone.textContent =
+          "✅ Tâches Supabase : " +
+          data.map(t => `${t.action} (${t.statut})`).join(" • ");
+      }
+    })
+    .catch(() => {
+      zone.textContent = "❌ Erreur : impossible de lire Supabase.";
+    });
+}
+  
 document.addEventListener("DOMContentLoaded", async()=>{
   db=await openDb();
 
@@ -1274,6 +1308,8 @@ document.addEventListener("DOMContentLoaded", async()=>{
     await render();
   });
 
+testSupabase();
+  
   // Ajout normal
   $("add-form").addEventListener("submit", async(e)=>{
     e.preventDefault();
@@ -1320,7 +1356,7 @@ document.addEventListener("DOMContentLoaded", async()=>{
 
   await render();
 
-  testAPI();  
+  // testAPI();  
 });
 </script>
 
