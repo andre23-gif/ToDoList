@@ -1210,7 +1210,7 @@ function testAPI(){
   // afficher le message tout en haut de la page
   document.body.prepend(zone);
 
-  fetch("https://forge.apps.education.fr/plessejulien/todolist/-/raw/main/api/items", {
+fetch("./api/items.json", {
     cache: "no-store"
   })
     .then(response => response.json())
