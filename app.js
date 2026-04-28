@@ -185,7 +185,8 @@ async function render(){
 // BOOT
 // =======================================================
 document.addEventListener("DOMContentLoaded", async()=>{
-
+// Sécurité : ne pas planter si le formulaire n'est pas encore géré
+if (!document.getElementById("add-form")) return;
   // AUTH UI
   const { data } = await supabase.auth.getUser();
   $("auth-form").style.display = data?.user ? "none" : "block";
