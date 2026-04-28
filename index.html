@@ -681,7 +681,7 @@
         await reg.update();
       } catch(e) {}
       navigator.serviceWorker.addEventListener("controllerchange", () => {
-        window.location.reload();
+       // window.location.reload();
       });
     });
   }
@@ -704,7 +704,7 @@
     .then(r => r.text())
     .then(html => {
       const m = html.match(/<meta\s+name=[^"']+["']/i);
-      const remoteBuild = m ? m[1] : build;
+const remoteBuild = build;
 
       sessionStorage.setItem(key, "1");
       if (remoteBuild !== build) {
@@ -718,11 +718,6 @@
     });
 })();
 </script>
-
-
-<p style="background:red;color:white;font-size:24px;">
-  TEST FICHIER MODIFIÉ
-</p>
 </body>
 </html>
 
