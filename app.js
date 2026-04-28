@@ -48,7 +48,10 @@ async function signup(email, password) {
   if (error) alert(error.message);
   else alert("Compte créé. Connecte-toi.");
 }
-
+async function logout() {
+  await supabaseClient.auth.signOut();
+  location.reload();
+}
 // =======================================================
 // ONGLET
 // =======================================================
@@ -67,7 +70,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ----- AUTH UI -----
   const { data } = await supabaseClient.auth.getUser();
-  $("auth-form").style.display = data?.user ? "none" : "block";
+   
+const authForm = $("auth-form");
+const userBar = $("user-bar");
+const userEmail = $("user-email");
+
+if (data?.user && data.user.email_confirmed_at) {
+  authForm.style.display = "none";
+  userBar.style.display = "block";
+  userEmail.textContent = "Connecté : " + data.user.email;
+} else {
+  authForm.style.display = "block";
+  userBar.style.display = "none";
+}
 
   $("btn-login").onclick = () =>
     login($("auth-email").value, $("auth-password").value);
@@ -84,4 +99,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("tab-todo").onclick = () => switchTab("todo");
   $("tab-archive").onclick = () => switchTab("archive");
   $("tab-stats").onclick = () => switchTab("stats");
+
+   $("btn-logout")?.addEventListener("click", logout);
 });
