@@ -11,7 +11,7 @@
   <!-- PWA (FIX : plus de texte brut affiché) -->
 <!-- PWA -->
 <link rel="manifest" href="./manifest.webmanifest">
-<link rel="="theme-color" content="#0B1F3B">
+<meta name="theme-color" content="#0B1F3B">
 
   <style>
     :root{
@@ -1197,74 +1197,15 @@ async function render(){
   }
 }
 
-<script>
-/* =================================================ment)/* =========================================================
-   - Test GitHub conservé mais désactivé
-   - Test Supabase actif
-   - DOMContentLoaded complet
-========================================================= */
-
-// ===== TEST API (GitHub) - désactivé =====
-function testAPI(){
-  const zone = document.createElement("div");
-  zone.style.padding = "12px";
-  zone.style.margin = "12px";
-  zone.style.border = "2px solid #C8A24A";
-  zone.style.background = "#FFFDF7";
-  zone.style.fontWeight = "bold";
-  zone.textContent = "⏳ Chargement des données GitHub…";
-  document.body.prepend(zone);
-
-  fetch("./api/items.json", { cache: "no-store" })
-    .then(response => response.json())
-    .then(data => {
-      zone.textContent = "✅ Données GitHub reçues : " + JSON.stringify(data);
-    })
-    .catch(() => {
-      zone.textContent = "❌ Erreur : impossible de lire les données GitHub.";
-    });
-}
-
-// ===== TEST SUPABASE (LECTURE) - actif =====
-function testSupabase(){
-  const zone = document.createElement("div");
-  zone.style.padding = "12px";
-  zone.style.margin = "12px";
-  zone.style.border = "2px solid #2CA768";
-  zone.style.background = "#F4FFF9";
-  zone.style.fontWeight = "bold";
-  zone.textContent = "⏳ Chargement des tâches depuis Supabase…";
-  document.body.prepend(zone);
-
-  fetch("https://pxdtyaqjxmihaeericqf.supabase.co/rest/v1/Tasks?select=action,statut", {
-    headers: {
-      apikey: "REMPLACE_ICI_PAR_TA_CLE_ANON_PUBLIC",
-      Authorization: "Bearer REMPLACE_ICI_PAR_TA_CLE_ANON_PUBLIC"
-    }
-  })
-    .then(r => r.json())
-    .then(data => {
-      if (!Array.isArray(data) || data.length === 0) {
-        zone.textContent = "ℹ️ Aucune tâche dans Supabase.";
-        return;
-      }
-      zone.innerHTML =
-        "<strong>✅ Tâches Supabase :</strong><ul style='margin-top:8px'>" +
-        data.map(t => `<li>${t.action} (${t.statut})</li>`).join("") +
-        "</ul>";
-    })
-    .catch(() => {
-      zone.textContent = "❌ Erreur : impossible de lire Supabase.";
-    });
-}
-
-// ===== BOOT APP (inchangé dans le fond, remis proprement) =====
+/* ===============================
+   Boot
+=============================== */
 document.addEventListener("DOMContentLoaded", async()=>{
-  db = await openDb();
+  db=await openDb();
 
-  fillSelect("famille", FAMILLES, FAMILLES[0]);
-  fillSelect("categorie", CATEGORIES, "Moi-même");
-  fillSelect("statut", STATUTS, "A faire");
+  fillSelect("famille",FAMILLES,FAMILLES[0]);
+  fillSelect("categorie",CATEGORIES,"Moi-même");
+  fillSelect("statut",STATUTS,"A faire");
 
   $("tab-todo").addEventListener("click", async()=>{ switchTab("todo"); await render(); });
   $("tab-archive").addEventListener("click", async()=>{ switchTab("archive"); await render(); });
@@ -1274,7 +1215,7 @@ document.addEventListener("DOMContentLoaded", async()=>{
   $("meetingToggle").addEventListener("change", (e)=>{ if(e.target.checked) openMeeting(); });
   $("closeMeeting").addEventListener("click", closeMeeting);
   $("meetingCancel").addEventListener("click", closeMeeting);
-  $("meetingOverlay").addEventListener("click",(e)=>{ if(e.target === $("meetingOverlay")) closeMeeting(); });
+  $("meetingOverlay").addEventListener("click",(e)=>{ if(e.target===$("meetingOverlay")) closeMeeting(); });
 
   $("meeting-form").addEventListener("submit", async(e)=>{
     e.preventDefault();
@@ -1294,16 +1235,16 @@ document.addEventListener("DOMContentLoaded", async()=>{
       device: DEVICE_ID,
       updatedAt: now,
       createdAt: now,
-      actionPrecise: label || "Réunion",
-      famille: "Réunion",
-      categorie: "Moi-même",
-      nom: meeting.people || "",
-      tempsEstime: "",
-      tempsReel: "",
-      dateLimite: meeting.date || "",
-      statut: "A faire",
-      archivedAt: null,
-      isMeeting: true,
+      actionPrecise:label||"Réunion",
+      famille:"Réunion",
+      categorie:"Moi-même",
+      nom:meeting.people||"",
+      tempsEstime:"",
+      tempsReel:"",
+      dateLimite:meeting.date||"",
+      statut:"A faire",
+      archivedAt:null,
+      isMeeting:true,
       meeting
     });
 
@@ -1323,22 +1264,22 @@ document.addEventListener("DOMContentLoaded", async()=>{
       device: DEVICE_ID,
       updatedAt: now,
       createdAt: now,
-      actionPrecise: $("actionPrecise").value.trim(),
-      famille: $("famille").value,
-      categorie: $("categorie").value,
-      nom: $("nom").value.trim(),
-      tempsEstime: $("tempsEstime").value,
-      tempsReel: $("tempsReel").value,
-      dateLimite: $("dateLimite").value,
+      actionPrecise:$("actionPrecise").value.trim(),
+      famille:$("famille").value,
+      categorie:$("categorie").value,
+      nom:$("nom").value.trim(),
+      tempsEstime:$("tempsEstime").value,
+      tempsReel:$("tempsReel").value,
+      dateLimite:$("dateLimite").value,
       statut,
       archivedAt: statut==="Terminé" ? now : null,
-      isMeeting: false,
-      meeting: null
+      isMeeting:false,
+      meeting:null
     });
 
     $("add-form").reset();
-    fillSelect("statut", STATUTS, "A faire");
-    fillSelect("categorie", CATEGORIES, "Moi-même");
+    fillSelect("statut",STATUTS,"A faire");
+    fillSelect("categorie",CATEGORIES,"Moi-même");
     $("meetingToggle").checked=false;
     await render();
   });
@@ -1357,10 +1298,6 @@ document.addEventListener("DOMContentLoaded", async()=>{
   });
 
   await render();
-
-  // ✅ Test actif : Supabase
-  testSupabase();
-  // testAPI(); // si tu veux tester GitHub à la place
 });
 </script>
 
@@ -1395,7 +1332,7 @@ document.addEventListener("DOMContentLoaded", async()=>{
   fetch(bustUrl, { cache: "no-store" })
     .then(r => r.text())
     .then(html => {
-      const m = html.match(/<meta\s+name=["']app-build["']\s+content=["']([^"']+)["']/i);
+      const m = html.match(/<meta\s+name=[^"']+["']/i);
       const remoteBuild = m ? m[1] : build;
 
       sessionStorage.setItem(key, "1");
