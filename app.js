@@ -1,16 +1,19 @@
-// ===============================
-// TEST DE CHARGEMENT app.js
-// ===============================
-alert("APP.JS EST BIEN CHARGÉ");
-
-// ===============================
-// TEST DE CLIC (SANS SUPABASE)
-// ===============================
 document.addEventListener("DOMContentLoaded", () => {
-  const btn = document.querySelector("#auth-form button");
-  if (btn) {
-    btn.addEventListener("click", () => {
-      alert("CLIC CAPTÉ PAR APP.JS");
+  const emailInput = document.getElementById("auth-email");
+  const passwordInput = document.getElementById("auth-password");
+
+  const btnLogin = document.getElementById("btn-login");
+  const btnSignup = document.getElementById("btn-signup");
+
+  if (btnLogin) {
+    btnLogin.addEventListener("click", () => {
+      login(emailInput.value, passwordInput.value);
+    });
+  }
+
+  if (btnSignup) {
+    btnSignup.addEventListener("click", () => {
+      signup(emailInput.value, passwordInput.value);
     });
   }
 });
