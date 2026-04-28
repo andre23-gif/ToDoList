@@ -461,6 +461,14 @@
   </div>
 </header>
 
+<div id="auth-form" style="display:none;">
+  <input id="auth-email" placeholder="email">
+  <input id="auth-password" type="password" placeholder="mot de passe">
+  <button onclick="login(auth-email.value, auth-password.value)">Connexion</button>
+  <button onclick="signup(auth-email.value, auth-password.value)">Inscription</button>
+</div>
+
+  
 <main>
   <section id="todo-section">
     <div class="card">
