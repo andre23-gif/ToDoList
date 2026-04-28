@@ -1,5 +1,5 @@
 /* =======================================================
-   APP.JS — VERSION COMPLÈTE
+   APP.JS — VERSION COMPLÈTE CORRIGÉE
    - Auth Supabase
    - Menus, archives, statistiques
    - Compatible GitHub Pages / PWA / Safari
@@ -120,7 +120,7 @@ async function addItem(item){
   SERVER_CACHE.unshift(item);
 }
 
-async function del(uid){
+async function delItem(uid){
   await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?uid=eq.${uid}`,{
     method:"DELETE",
     headers: sbHeaders()
@@ -163,7 +163,10 @@ async function render(){
       </select>
       <div class="trash">🗑</div>
     `;
-    li.querySelector(".trash").onclick=async()=>{ await del(it.uid); render(); };
+    li.querySelector(".trash").onclick=async()=>{
+      await delItem(it.uid);
+      render();
+    };
     li.querySelector(".status").onchange=async e=>{
       it.statut=e.target.value;
       await serverUpsert(it);
@@ -182,29 +185,47 @@ async function render(){
 }
 
 // =======================================================
-// BOOT
+// BOOT (⚠️ PAS DE RETURN GLOBAL)
 // =======================================================
 document.addEventListener("DOMContentLoaded", async()=>{
-// Sécurité : ne pas planter si le formulaire n'est pas encore géré
-if (!document.getElementById("add-form")) return;
-  // AUTH UI
+
+  // ----- AUTH UI -----
   const { data } = await supabase.auth.getUser();
   $("auth-form").style.display = data?.user ? "none" : "block";
 
-  // boutons auth
-  $("btn-login").onclick=()=>login($("auth-email").value,$("auth-password").value);
-  $("btn-signup").onclick=()=>signup($("auth-email").value,$("auth-password").value);
+  $("btn-login")?.addEventListener("click",()=>{
+    login($("auth-email").value,$("auth-password").value);
+  });
+  $("btn-signup")?.addEventListener("click",()=>{
+    signup($("auth-email").value,$("auth-password").value);
+  });
 
-  // menus
+  // ----- MENUS -----
   fillSelect("famille",FAMILLES,FAMILLES[0]);
   fillSelect("categorie",CATEGORIES,"Moi-même");
   fillSelect("statut",STATUTS,"A faire");
 
-  // tabs
-  $("tab-todo").onclick=()=>switchTab("todo");
-  $("tab-archive").onclick=()=>switchTab("archive");
-  $("tab-stats").onclick=()=>switchTab("stats");
+  // ----- TABS -----
+  $("tab-todo")?.addEventListener("click",()=>switchTab("todo"));
+  $("tab-archive")?.addEventListener("click",()=>switchTab("archive"));
+  $("tab-stats")?.addEventListener("click",()=>switchTab("stats"));
+
+  // ----- ADD FORM (OPTIONNEL, SANS BLOQUER) -----
+  const addForm = $("add-form");
+  if (addForm) {
+    addForm.addEventListener("submit", async(e)=>{
+      e.preventDefault();
+      await addItem({
+        actionPrecise: $("actionPrecise").value.trim(),
+        famille: $("famille").value,
+        categorie: $("categorie").value,
+        statut: $("statut").value
+      });
+      addForm.reset();
+      render();
+    });
+  }
 
   await serverInit();
-  render();
+  await render();
 });
