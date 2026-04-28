@@ -11,6 +11,7 @@
   <!-- PWA (FIX : plus de texte brut affiché) -->
 <!-- PWA -->
 <link rel="manifest" href="./manifest.webmanifest">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <meta name="theme-color" content="#0B1F3B">
 
   <style>
@@ -689,7 +690,13 @@ const CATEGORIES = [
   "Professeurs principaux","Public"
 ];
 const STATUTS = ["A faire","En cours","Terminé"];
-
+// =======================================================
+// SUPABASE AUTH — CLIENT (EMAIL / PASSWORD)
+// =======================================================
+const supabase = window.supabase.createClient(
+  "https://pxdtyaqjxmihaeericqf.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4ZHR5YXFqeG1paGFlZXJpY3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxODg1NDEsImV4cCI6MjA5Mjc2NDU0MX0.3sS2Nj9GqcgEAn8OzA1a24xOiwDCIWFL-XKLTd9CWus"
+);
 // =======================================================
 // SUPABASE (CAS B COMPLET) — CONFIG
 // =======================================================
@@ -697,6 +704,35 @@ const SUPABASE_URL = "https://pxdtyaqjxmihaeericqf.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4ZHR5YXFqeG1paGFlZXJpY3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxODg1NDEsImV4cCI6MjA5Mjc2NDU0MX0.3sS2Nj9GqcgEAn8OzA1a24xOiwDCIWFL-XKLTd9CWus";
 const SUPABASE_TABLE = "Tasks";
 
+// =======================================================
+// SUPABASE AUTH — ACTIONS
+// =======================================================
+
+async function login(email, password) {
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
+  if (error) {
+    alert(error.message);
+    return;
+  }
+  location.reload();
+}
+
+async function signup(email, password) {
+  const { error } = await supabase.auth.signUp({
+    email,
+    password
+  });
+  if (error) {
+    alert(error.message);
+    return;
+  }
+  alert("Compte créé. Connecte-toi.");
+}
+``
+  
 function sbHeaders(extra = {}) {
   return {
     apikey: SUPABASE_KEY,
@@ -1339,6 +1375,14 @@ async function del(id){
    Boot
 =============================== */
 document.addEventListener("DOMContentLoaded", async()=>{
+  const { data } = await supabase.auth.getUser();
+
+if (!data?.user) {
+  document.getElementById("auth-form").style.display = "block";
+} else {
+  document.getElementById("auth-form").style.display = "none";
+}
+
   db=await openDb();
   await serverInit();
 
