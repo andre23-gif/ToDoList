@@ -29,8 +29,21 @@ function fillSelect(id, values) {
 // =======================================================
 // DONNÉES
 // =======================================================
-const FAMILLES = ["Amicale", "Cours", "Gestion"];
-const CATEGORIES = ["Moi-même", "Parents", "Collègues"];
+const FAMILLES = [
+"Amicale","Baroque","CDC/suivi","Communication","Coordination","Correction",
+  "Cours","Gestion","Histoire des Arts","Instances","Numérique","Parcours Avenir",
+  "Pépinières","Photocopies","Préparation","Réunion"
+];
+const CATEGORIES = [
+ "Moi-même",
+  "Parents",
+  "Partenaires",
+  "Collègues",
+  "Administration",
+  "Elèves",
+  "Professeurs principaux",
+  "Public"
+];
 const STATUTS = ["A faire", "En cours", "Terminé"];
 
 // =======================================================
