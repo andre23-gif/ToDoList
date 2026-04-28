@@ -188,7 +188,7 @@ async function render(){
 // BOOT (⚠️ PAS DE RETURN GLOBAL)
 // =======================================================
 document.addEventListener("DOMContentLoaded", async()=>{
-
+  alert("BOOT ATTEINT");
   // ----- AUTH UI -----
   const { data } = await supabase.auth.getUser();
   $("auth-form").style.display = data?.user ? "none" : "block";
