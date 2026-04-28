@@ -690,6 +690,21 @@ const CATEGORIES = [
 ];
 const STATUTS = ["A faire","En cours","Terminé"];
 
+// =======================================================
+// SUPABASE (CAS B COMPLET) — CONFIG
+// =======================================================
+const SUPABASE_URL = "https://pxdtyaqjxmihaeericqf.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4ZHR5YXFqeG1paGFlZXJpY3FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxODg1NDEsImV4cCI6MjA5Mjc2NDU0MX0.3sS2Nj9GqcgEAn8OzA1a24xOiwDCIWFL-XKLTd9CWus";
+const SUPABASE_TABLE = "Tasks";
+
+function sbHeaders(extra = {}) {
+  return {
+    apikey: SUPABASE_KEY,
+    Authorization: "Bearer " + SUPABASE_KEY,
+    ...extra
+  };
+}
+  
 // IndexedDB
 const DB_NAME="todo_local_db";
 const DB_VERSION=13;
@@ -1197,11 +1212,135 @@ async function render(){
   }
 }
 
+// =======================================================
+// SUPABASE — MODE SERVEUR (override sans casser l'app)
+// - getAll / addItem / putItem / del utilisent Supabase
+// - on garde la forme des objets identique (id = uid) pour ne rien casser
+// =======================================================
+
+let SERVER_CACHE = null;
+
+// Charge tout depuis Supabase dans un cache mémoire
+async function serverInit(){
+  const url = `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?select=uid,updated_at,payload&order=updated_at.desc.nullslast`;
+  const r = await fetch(url, { headers: sbHeaders() });
+  if(!r.ok) throw new Error("Supabase GET failed");
+
+  const rows = await r.json();
+  SERVER_CACHE = rows
+    .map(row => row.payload)
+    .filter(Boolean)
+    .map(item => {
+      // IMPORTANT : pour compatibilité avec ton code existant
+      // ton app utilise it.id (ex: finishTaskById, del(it.id), etc.)
+      // donc on met id = uid
+      if(item.uid) item.id = item.uid;
+      return item;
+    });
+}
+
+// Upsert (création ou mise à jour) d’un item complet
+async function serverUpsert(item){
+  if(!item.uid) throw new Error("item.uid manquant");
+  const now = Date.now();
+
+  if(!item.createdAt) item.createdAt = now;
+  item.updatedAt = now;
+
+  // compat UI existante
+  item.id = item.uid;
+
+  const row = {
+    uid: item.uid,
+    updated_at: item.updatedAt,
+    payload: item,
+    // si ta table a encore action/statut, c’est utile de les remplir aussi
+    action: item.actionPrecise || "",
+    statut: item.statut || "A faire"
+  };
+
+  const url = `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?on_conflict=uid`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: sbHeaders({
+      "Content-Type": "application/json",
+      "Prefer": "resolution=merge-duplicates"
+    }),
+    body: JSON.stringify(row)
+  });
+  if(!r.ok) throw new Error("Supabase UPSERT failed");
+}
+
+// Suppression serveur
+async function serverDelete(uid){
+  const url = `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?uid=eq.${encodeURIComponent(uid)}`;
+  const r = await fetch(url, {
+    method: "DELETE",
+    headers: sbHeaders()
+  });
+  if(!r.ok) throw new Error("Supabase DELETE failed");
+}
+
+// =======================================================
+// OVERRIDES : ces fonctions remplacent celles d’IndexedDB
+// (ton code existant continue de fonctionner sans modification)
+// =======================================================
+
+async function getAll(){
+  if(SERVER_CACHE === null){
+    await serverInit();
+  }
+  return SERVER_CACHE.slice();
+}
+
+async function addItem(item){
+  // garantir uid
+  if(!item.uid) item.uid = makeUID();
+
+  // serveur
+  await serverUpsert(item);
+
+  // cache local mémoire (pour affichage immédiat)
+  if(SERVER_CACHE === null) SERVER_CACHE = [];
+  SERVER_CACHE.unshift(item);
+
+  return item.uid; // on renvoie un identifiant stable
+}
+
+async function putItem(item){
+  // item.id = uid dans ton app
+  const uid = item.uid || item.id;
+  if(!uid) throw new Error("putItem: uid manquant");
+  item.uid = uid;
+
+  await serverUpsert(item);
+
+  if(SERVER_CACHE === null) SERVER_CACHE = [];
+  const i = SERVER_CACHE.findIndex(x => x.uid === uid);
+  if(i >= 0) SERVER_CACHE[i] = item;
+  else SERVER_CACHE.unshift(item);
+
+  return true;
+}
+
+async function del(id){
+  // dans ton app, id == uid (grâce au mapping)
+  const uid = id;
+  await serverDelete(uid);
+
+  if(SERVER_CACHE !== null){
+    SERVER_CACHE = SERVER_CACHE.filter(x => x.uid !== uid);
+  }
+  return true;
+}
+
+  
 /* ===============================
    Boot
 =============================== */
 document.addEventListener("DOMContentLoaded", async()=>{
   db=await openDb();
+  await serverInit();
 
   fillSelect("famille",FAMILLES,FAMILLES[0]);
   fillSelect("categorie",CATEGORIES,"Moi-même");
