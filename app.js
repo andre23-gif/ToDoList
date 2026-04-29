@@ -1,12 +1,6 @@
 /* =======================================================
    app.js — COMPLET (PWA offline + Supabase + ToDo/Archives/Stats/Réunions)
    Version unique propre (aucune coupe de fonctionnalités)
-
-   Corrections majeures vs ton fichier actuel :
-   - esc() correct (échappement HTML)  [1](https://onedrive.live.com?cid=53EDF03465DDCC82&id=53EDF03465DDCC82!se68d1400d7c14b6bada91b9e418517d3)
-   - importCSV() corrigé (boucle valide) [1](https://onedrive.live.com?cid=53EDF03465DDCC82&id=53EDF03465DDCC82!se68d1400d7c14b6bada91b9e418517d3)
-   - upsertServer() écrit aussi action/statut/created_at en colonnes SQL
-   - fetchAllFromServer() réinjecte uid/owner/updatedAt depuis les colonnes
 ======================================================= */
 
 /* ---------- Supabase Client (NE JAMAIS nommer "supabase") ---------- */
