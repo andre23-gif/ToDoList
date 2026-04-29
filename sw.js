@@ -1,4 +1,4 @@
-const CACHE_NAME = "todo-pwa-v3"; // <-- incrémente à chaque déploiement
+const CACHE_NAME = "todo-pwa-v4"; // <-- incrémente v2, v3… à chaque mise à jour
 
 const APP_SHELL = [
   "/ToDoList/",
@@ -22,14 +22,13 @@ self.addEventListener("activate", (event) => {
   })());
 });
 
-// Network-first pour index.html + app.js (évite "ancienne version")
-// Cache-first pour icônes
+// Network-first pour l'app shell (évite "ancienne version"), cache-first pour le reste
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
-  const isSameOrigin = url.origin === self.location.origin;
-  if (!isSameOrigin) return; // laisse le navigateur gérer les CDN (Supabase JS, etc.)
+  // Ne touche pas aux appels externes (cdn, supabase…)
+  if (url.origin !== self.location.origin) return;
 
   const path = url.pathname;
 
@@ -39,8 +38,6 @@ self.addEventListener("fetch", (event) => {
     path === "/ToDoList/app.js" ||
     path === "/ToDoList/manifest.webmanifest";
 
-  const isIcon = path === "/ToDoList/icon-192.png" || path === "/ToDoList/icon-512.png";
-
   if (isAppShell) {
     event.respondWith((async () => {
       try {
@@ -48,7 +45,7 @@ self.addEventListener("fetch", (event) => {
         const cache = await caches.open(CACHE_NAME);
         cache.put(req, fresh.clone());
         return fresh;
-      } catch (e) {
+      } catch {
         const cached = await caches.match(req);
         return cached || caches.match("/ToDoList/index.html");
       }
@@ -56,11 +53,5 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (isIcon) {
-    event.respondWith(caches.match(req).then(r => r || fetch(req)));
-    return;
-  }
-
-  // reste : cache-first simple
   event.respondWith(caches.match(req).then(r => r || fetch(req)));
 });
