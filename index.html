@@ -59,6 +59,19 @@
       box-shadow:0 10px 30px rgba(0,0,0,.22);
     }
     .wrap{ max-width:980px; margin:0 auto; }
+    header .wrap{ position:relative; }
+
+#sync-dot{
+  position:absolute;
+  top:10px;
+  right:12px;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:#2CA768; /* vert */
+  box-shadow: 0 0 0 2px rgba(255,255,255,.35);
+  display:none; /* affiché via app.js quand connecté */
+}
     .title{
       margin:0;
       display:flex;
@@ -437,21 +450,41 @@
       display:inline-block;
     }
 
-    footer{
-      position:fixed; left:0; right:0; bottom:0;
-      display:flex; gap:10px; justify-content:center;
-      padding:10px;
-      background: rgba(251,250,246,.92);
-      backdrop-filter: blur(8px);
-      border-top:1px solid rgba(0,0,0,.08);
-      z-index: 1000;
-    }
+   footer{
+  position:fixed; left:0; right:0; bottom:0;
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  justify-content:center;
+  align-items:center;
+  padding:10px;
+  background: rgba(251,250,246,.92);
+  backdrop-filter: blur(8px);
+  border-top:1px solid rgba(0,0,0,.08);
+  z-index: 1000;
+}
+#auth-form, #user-bar{
+  display:none;
+  gap:10px;
+  align-items:center;
+  justify-content:center;
+  flex-wrap:wrap;
+  padding:0;
+}
+#auth-form input{
+  width:min(220px, 42vw);
+  border:1px solid rgba(11,31,59,.22);
+  border-radius:999px;
+  padding:10px 12px;
+  font-weight:900;
+}
   </style>
 </head>
 
 <body>
 <header>
   <div class="wrap">
+    <span id="sync-dot" aria-label="synchro"></span>
     <h1 class="title"><span class="badge">✓</span>To Do List</h1>
     <div class="tabs">
       <button class="tab active" id="tab-todo" type="button">À faire</button>
@@ -460,20 +493,9 @@
     </div>
   </div>
 </header>
-<div id="user-bar" style="display:none; padding:10px; text-align:center;">
-  <span id="user-email"></span>
-  <button id="btn-logout" class="btn ghost" type="button">Déconnexion</button>
-</div>
   <div id="net-banner" style="display:none; padding:8px; text-align:center; background:#7B2D2D; color:#fff; font-weight:900;">
   Hors‑ligne : affichage en cache (synchro au retour réseau)
 </div>
-<div id="auth-form" style="display:none;">
-  <input id="auth-email" placeholder="email">
-  <input id="auth-password" type="password" placeholder="mot de passe">
-<button id="btn-login" type="button">Connexion</button>
-<button id="btn-signup" type="button">Inscription</button>
-</div>
-
   
 <main>
   <section id="todo-section">
@@ -616,6 +638,18 @@
   <button class="btn ghost" id="export-btn" type="button">Exporter CSV</button>
   <button class="btn ghost" id="import-btn" type="button">Importer CSV</button>
   <input id="import-file" type="file" accept=".csv,text/csv" hidden>
+
+  <div id="auth-form" style="display:none;">
+    <input id="auth-email" placeholder="email">
+    <input id="auth-password" type="password" placeholder="mot de passe">
+    <button id="btn-login" type="button">Connexion</button>
+    <button id="btn-signup" type="button">Inscription</button>
+  </div>
+
+  <div id="user-bar" style="display:none; padding:10px; text-align:center;">
+    <span id="user-email"></span>
+    <button id="btn-logout" class="btn ghost" type="button">Déconnexion</button>
+  </div>
 </footer>
 
 <!-- POPUP RÉUNION -->
