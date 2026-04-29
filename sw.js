@@ -1,5 +1,6 @@
-const CACHE_NAME = "todo-pwa-v2"; // <-- incrémente à chaque mise à jour
-const ASSETS = [
+const CACHE_NAME = "todo-pwa-v3"; // <-- incrémente à chaque déploiement
+
+const APP_SHELL = [
   "/ToDoList/",
   "/ToDoList/index.html",
   "/ToDoList/app.js",
@@ -10,9 +11,7 @@ const ASSETS = [
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then((c) => c.addAll(APP_SHELL)));
 });
 
 self.addEventListener("activate", (event) => {
@@ -23,33 +22,45 @@ self.addEventListener("activate", (event) => {
   })());
 });
 
-// Network-first pour éviter de rester bloqué sur une vieille version
+// Network-first pour index.html + app.js (évite "ancienne version")
+// Cache-first pour icônes
 self.addEventListener("fetch", (event) => {
-  const url = new URL(event.request.url);
+  const req = event.request;
+  const url = new URL(req.url);
+
+  const isSameOrigin = url.origin === self.location.origin;
+  if (!isSameOrigin) return; // laisse le navigateur gérer les CDN (Supabase JS, etc.)
+
+  const path = url.pathname;
 
   const isAppShell =
-    url.pathname === "/ToDoList/" ||
-    url.pathname.endsWith("/ToDoList/index.html") ||
-    url.pathname.endsWith("/ToDoList/app.js") ||
-    url.pathname.endsWith("/ToDoList/manifest.webmanifest");
+    path === "/ToDoList/" ||
+    path === "/ToDoList/index.html" ||
+    path === "/ToDoList/app.js" ||
+    path === "/ToDoList/manifest.webmanifest";
+
+  const isIcon = path === "/ToDoList/icon-192.png" || path === "/ToDoList/icon-512.png";
 
   if (isAppShell) {
     event.respondWith((async () => {
       try {
-        const fresh = await fetch(event.request, { cache: "no-store" });
+        const fresh = await fetch(req, { cache: "no-store" });
         const cache = await caches.open(CACHE_NAME);
-        cache.put(event.request, fresh.clone());
+        cache.put(req, fresh.clone());
         return fresh;
-      } catch {
-        const cached = await caches.match(event.request);
-        return cached || Response.error();
+      } catch (e) {
+        const cached = await caches.match(req);
+        return cached || caches.match("/ToDoList/index.html");
       }
     })());
     return;
   }
 
-  // Cache-first pour les autres ressources
-  event.respondWith(
-    caches.match(event.request).then(resp => resp || fetch(event.request))
-  );
+  if (isIcon) {
+    event.respondWith(caches.match(req).then(r => r || fetch(req)));
+    return;
+  }
+
+  // reste : cache-first simple
+  event.respondWith(caches.match(req).then(r => r || fetch(req)));
 });
