@@ -736,8 +736,6 @@ async function render(){
 ======================================================= */
 document.addEventListener("DOMContentLoaded", async()=>{
   refreshNetBanner();
-   refreshSyncDot();
-
   // auth / user bar
   CURRENT_USER = await getCurrentUser();
 
@@ -753,7 +751,8 @@ document.addEventListener("DOMContentLoaded", async()=>{
     authForm.style.display = "block";
     userBar.style.display = "none";
   }
-
+ refreshSyncDot();
+   
   $("btn-login")?.addEventListener("click", ()=>login($("auth-email").value, $("auth-password").value));
   $("btn-signup")?.addEventListener("click", ()=>signup($("auth-email").value, $("auth-password").value));
   $("btn-logout")?.addEventListener("click", logout);
