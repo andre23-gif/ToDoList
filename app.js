@@ -92,7 +92,38 @@ function queueOp(op){
   q.push(op);
   saveQueue(q);
 }
+// =======================================================
+// SYNC DOT (pastille en haut à droite)
+// vert = synchro OK, orange = synchro en cours, rouge = en attente/offline
+// =======================================================
+function setSyncDot(color, visible) {
+  const dot = document.getElementById("sync-dot");
+  if (!dot) return;
+  dot.style.background = color;
+  dot.style.display = visible ? "block" : "none";
+}
 
+function refreshSyncDot() {
+  const q = loadQueue();
+  const isConnected = CURRENT_USER && CURRENT_USER.email_confirmed_at;
+
+  if (!isConnected) {
+    setSyncDot("#2CA768", false); // caché si non connecté
+    return;
+  }
+
+  if (!navigator.onLine) {
+    setSyncDot("#7B2D2D", true); // rouge si hors-ligne
+    return;
+  }
+
+  if (q.length > 0) {
+    setSyncDot("#7B2D2D", true); // rouge si des opérations en attente
+    return;
+  }
+
+  setSyncDot("#2CA768", true);   // vert si tout est OK
+}
 /* =======================================================
    AUTH + USER BAR
 ======================================================= */
@@ -224,11 +255,25 @@ async function deleteServer(uid){
 }
 
 async function flushQueue(){
-  if(!navigator.onLine) return;
-  if(!CURRENT_USER) return;
+  // si offline / pas connecté : on met juste à jour la pastille et on sort
+  if(!navigator.onLine){
+    refreshSyncDot();
+    return;
+  }
+  if(!CURRENT_USER){
+    refreshSyncDot();
+    return;
+  }
 
   const q = loadQueue();
-  if(!q.length) return;
+  if(!q.length){
+    // rien à envoyer : on remet la pastille à l'état normal (vert/rouge selon cas)
+    refreshSyncDot();
+    return;
+  }
+
+  // il y a des opérations à envoyer => orange "sync en cours"
+  setSyncDot("#C8A24A", true);
 
   const remaining = [];
   for(const op of q){
@@ -239,7 +284,11 @@ async function flushQueue(){
       remaining.push(op);
     }
   }
+
   saveQueue(remaining);
+
+  // fin de synchro : si remaining > 0 => rouge, sinon vert
+  refreshSyncDot();
 }
 
 /* =======================================================
@@ -687,6 +736,7 @@ async function render(){
 ======================================================= */
 document.addEventListener("DOMContentLoaded", async()=>{
   refreshNetBanner();
+   refreshSyncDot();
 
   // auth / user bar
   CURRENT_USER = await getCurrentUser();
@@ -802,6 +852,19 @@ document.addEventListener("DOMContentLoaded", async()=>{
     await render();
   });
 
+// ===== Sync dot + flush automatique au retour réseau =====
+  window.addEventListener("online", async () => {
+    refreshNetBanner();
+    refreshSyncDot();
+    try { await flushQueue(); } catch {}
+    refreshSyncDot();
+  });
+
+  window.addEventListener("offline", () => {
+    refreshNetBanner();
+    refreshSyncDot();
+  });
+   
   // load data + flush offline ops
   try{
     await flushQueue();
