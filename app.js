@@ -1,8 +1,12 @@
 /* =======================================================
    app.js — COMPLET (PWA offline + Supabase + ToDo/Archives/Stats/Réunions)
-   ✅ Corrigé : insert/upsert serveur (action + created_at + statut)
-   ✅ Corrigé : esc() (échappement HTML)
-   ✅ Corrigé : importCSV() (boucle cassée)
+   Version unique propre (aucune coupe de fonctionnalités)
+
+   Corrections majeures vs ton fichier actuel :
+   - esc() correct (échappement HTML)  [1](https://onedrive.live.com?cid=53EDF03465DDCC82&id=53EDF03465DDCC82!se68d1400d7c14b6bada91b9e418517d3)
+   - importCSV() corrigé (boucle valide) [1](https://onedrive.live.com?cid=53EDF03465DDCC82&id=53EDF03465DDCC82!se68d1400d7c14b6bada91b9e418517d3)
+   - upsertServer() écrit aussi action/statut/created_at en colonnes SQL
+   - fetchAllFromServer() réinjecte uid/owner/updatedAt depuis les colonnes
 ======================================================= */
 
 /* ---------- Supabase Client (NE JAMAIS nommer "supabase") ---------- */
@@ -129,7 +133,7 @@ window.addEventListener("offline", refreshNetBanner);
    DATA (Supabase)
 ======================================================= */
 let CURRENT_USER = null;   // { id, email, email_confirmed_at }
-let SERVER_CACHE = null;   // array of payload items (with id = uid)
+let SERVER_CACHE = null;   // array of items
 
 async function getCurrentUser(){
   const { data } = await supabaseClient.auth.getUser();
@@ -143,9 +147,10 @@ function normalizeItem(it){
 }
 
 async function fetchAllFromServer(){
+  // On récupère aussi les colonnes SQL, mais on continue à utiliser payload comme vérité principale
   const { data, error } = await supabaseClient
     .from(TABLE)
-    .select("uid, updated_at, payload, owner, action, statut, created_at")
+    .select("uid, updated_at, created_at, action, statut, owner, payload")
     .order("updated_at", { ascending: false });
 
   if(error) throw error;
@@ -153,16 +158,27 @@ async function fetchAllFromServer(){
   const items = (data || [])
     .map(r => {
       const it = r.payload || {};
-      // robustesse : réinjecter uid/owner si absent
+
+      // réinjecter l’identifiant si payload incomplet
       it.uid = it.uid || r.uid;
       it.id = it.uid;
+
+      // owner
       it.owner = it.owner || r.owner || null;
-      // fallback actionPrecise si seulement "action" existe
+
+      // updatedAt en ms (colonne updated_at = int8)
+      if (!it.updatedAt && r.updated_at != null) it.updatedAt = r.updated_at;
+
+      // createdAt en ms si possible
+      if (!it.createdAt && r.created_at) {
+        const ms = Date.parse(r.created_at);
+        if (Number.isFinite(ms)) it.createdAt = ms;
+      }
+
+      // si payload ne contient pas actionPrecise/statut, fallback des colonnes
       if (!it.actionPrecise && r.action) it.actionPrecise = r.action;
-      // fallback statut
       if (!it.statut && r.statut) it.statut = r.statut;
-      // conserver updatedAt
-      it.updatedAt = it.updatedAt || r.updated_at || null;
+
       return normalizeItem(it);
     })
     .filter(Boolean);
@@ -172,31 +188,33 @@ async function fetchAllFromServer(){
   return items;
 }
 
-/* ✅ CORRECTION MAJEURE : action + created_at + statut obligatoires */
+/* ✅ Écriture serveur complète : payload + colonnes SQL */
 async function upsertServer(item){
   if(!CURRENT_USER) throw new Error("Pas d'utilisateur");
 
-  const nowMs = Date.now();
-  if(!item.uid) item.uid = makeUID();
+  const now = Date.now();
 
-  // champs payload (ton modèle applicatif)
-  if(!item.createdAt) item.createdAt = nowMs;
-  item.updatedAt = nowMs;
+  if(!item.uid) item.uid = makeUID();
+  if(!item.createdAt) item.createdAt = now;
+
+  item.updatedAt = now;
   item.device = item.device || DEVICE_ID;
   item.id = item.uid;
   item.owner = CURRENT_USER.id;
 
-  // champs SQL (ta table)
+  // created_at en timestamp ISO pour la colonne timestamp
   const createdAtISO = new Date(item.createdAt).toISOString();
 
   const row = {
     uid: item.uid,
-    updated_at: item.updatedAt,                 // int8
-    created_at: createdAtISO,                   // timestamp (NOT NULL)
-    owner: CURRENT_USER.id,                     // uuid
-    action: item.actionPrecise || "(sans titre)", // text (NOT NULL)
-    statut: item.statut || "A faire",           // text
-    payload: item                                // jsonb
+    updated_at: item.updatedAt,                     // int8
+    owner: CURRENT_USER.id,                         // uuid
+    payload: item,                                  // jsonb
+
+    // colonnes SQL (si ta table les impose)
+    action: item.actionPrecise || "(sans titre)",   // text NOT NULL
+    statut: item.statut || "A faire",               // text
+    created_at: createdAtISO                        // timestamp NOT NULL
   };
 
   const { error } = await supabaseClient
@@ -257,6 +275,7 @@ async function finishTaskById(uid){
 
   it.statut = "Terminé";
   it.archivedAt = Date.now();
+
   await saveItem(it);
   return true;
 }
@@ -274,11 +293,13 @@ async function updateStatus(uid, statut){
    DATA API (online/offline)
 ======================================================= */
 async function getAll(){
+  // offline => dernier cache
   if(!navigator.onLine){
     const cached = loadLocalCache();
     SERVER_CACHE = cached;
     return cached.slice();
   }
+
   if(SERVER_CACHE) return SERVER_CACHE.slice();
   return await fetchAllFromServer();
 }
@@ -296,14 +317,13 @@ async function saveItem(item){
     return;
   }
 
-  // online => server + flush
-  try {
+  // online => server + flush (avec gestion d’erreur visible)
+  try{
     await upsertServer(item);
     await flushQueue();
-  } catch (e) {
-    // si écriture serveur refusée, on ne fait pas croire que c’est synchronisé
+  } catch(e){
     queueOp({ type:"upsert", item });
-    alert("Sauvegarde serveur refusée (mise en attente) : " + (e?.message || e));
+    alert("Sauvegarde serveur échouée (mise en attente) : " + (e?.message || e));
   }
 }
 
@@ -317,12 +337,12 @@ async function removeItem(uid){
     return;
   }
 
-  try {
+  try{
     await deleteServer(uid);
     await flushQueue();
-  } catch (e) {
+  } catch(e){
     queueOp({ type:"delete", uid });
-    alert("Suppression serveur refusée (mise en attente) : " + (e?.message || e));
+    alert("Suppression serveur échouée (mise en attente) : " + (e?.message || e));
   }
 }
 
@@ -339,35 +359,42 @@ function switchTab(tab){
 }
 
 /* =======================================================
-   STATS (canvas) — conservé (inchangé)
+   STATS (canvas) — conservées (tes fonctions)
 ======================================================= */
 function parseTimeToMinutes(t){
   if(!t || !t.includes(":")) return 0;
   const [h,m]=t.split(":").map(n=>parseInt(n,10));
   return (isNaN(h)||isNaN(m))?0:h*60+m;
 }
+
 function dateKeyForItem(it){
   if(it.dateLimite) return it.dateLimite;
   if(it.isMeeting && it.meeting?.date) return it.meeting.date;
   return new Date(it.createdAt||Date.now()).toISOString().slice(0,10);
 }
+
 function clearCanvas(c){
   const ctx=c.getContext("2d");
   ctx.clearRect(0,0,c.width,c.height);
   return ctx;
 }
+
 function drawLine(canvas, labels, values){
   const ctx = clearCanvas(canvas);
   const W = canvas.width, H = canvas.height;
   const padL=70,padR=20,padT=20,padB=60;
   const max = Math.max(10, ...values);
+
+  // axes
   ctx.strokeStyle="rgba(7,22,42,.25)";
   ctx.beginPath();
   ctx.moveTo(padL,padT);
   ctx.lineTo(padL,H-padB);
   ctx.lineTo(W-padR,H-padB);
   ctx.stroke();
+
   if(!labels.length) return;
+
   const stepX=(W-padL-padR)/Math.max(1,labels.length-1);
   ctx.strokeStyle="rgba(200,162,74,.95)";
   ctx.lineWidth=3;
@@ -378,6 +405,8 @@ function drawLine(canvas, labels, values){
     if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
   });
   ctx.stroke();
+
+  // points
   ctx.fillStyle="rgba(200,162,74,.95)";
   labels.forEach((lab,i)=>{
     const x=padL+stepX*i;
@@ -387,7 +416,9 @@ function drawLine(canvas, labels, values){
     ctx.fill();
   });
 }
+
 const PIE_COLORS=["#C8A24A","#0B1F3B","#2CA768","#7B5F2A","#7D3C98","#1F77B4","#D35400","#2E4053"];
+
 function drawPie(canvas, entries){
   const ctx=clearCanvas(canvas), W=canvas.width,H=canvas.height,cx=W/2,cy=H/2,r=Math.min(W,H)*0.32;
   const total=entries.reduce((s,e)=>s+e.value,0)||1;
@@ -399,6 +430,7 @@ function drawPie(canvas, entries){
     a+=slice;
   });
 }
+
 function renderPieLegend(entries){
   const box = $("pieLegend");
   if(!box) return;
@@ -416,6 +448,7 @@ function renderPieLegend(entries){
     box.appendChild(item);
   });
 }
+
 function drawBars(canvas, entries){
   const ctx=clearCanvas(canvas);
   const W=canvas.width,H=canvas.height;
@@ -424,6 +457,7 @@ function drawBars(canvas, entries){
   const n=Math.max(1,entries.length);
   const slot=(W-padL-padR)/n;
   const barW=Math.max(18,slot*0.55);
+
   entries.forEach((e,i)=>{
     const x=padL+i*slot+(slot-barW)/2;
     const h=(H-padT-padB)*(e.value/maxV);
@@ -432,16 +466,20 @@ function drawBars(canvas, entries){
     ctx.fillRect(x,y,barW,h);
   });
 }
+
 async function renderStats(items){
   const from=$("statsFrom").value?new Date($("statsFrom").value):null;
   const to=$("statsTo").value?new Date($("statsTo").value):null;
   const mode=$("statsTimeMode").value;
+
   const filtered=items.filter(it=>{
     const d=new Date(dateKeyForItem(it));
     if(from && d<from) return false;
     if(to && d>to) return false;
     return true;
   });
+
+  // Courbe temps
   const map=new Map();
   filtered.forEach(it=>{
     const k=dateKeyForItem(it);
@@ -451,12 +489,16 @@ async function renderStats(items){
   const labels=Array.from(map.keys()).sort();
   const values=labels.map(k=>map.get(k));
   drawLine($("lineChart"), labels, values);
+
+  // Légende
   const legend=$("lineLegend");
   if(legend){
     const total=values.reduce((a,b)=>a+b,0);
     const h=Math.floor(total/60), m=total%60;
     legend.textContent = `Total ${mode==="reel"?"réel":"estimé"} : ${h}h${m}min`;
   }
+
+  // Familles
   const fam=new Map();
   filtered.forEach(it=>{
     const k=it.famille||"(Sans famille)";
@@ -466,6 +508,8 @@ async function renderStats(items){
     .sort((a,b)=>b.value-a.value).slice(0,8);
   drawPie($("pieChart"), famEntries);
   renderPieLegend(famEntries);
+
+  // Statuts
   const st=new Map([["A faire",0],["En cours",0],["Terminé",0]]);
   filtered.forEach(it=>st.set(it.statut,(st.get(it.statut)||0)+1));
   const stEntries=Array.from(st.entries()).map(([label,value])=>({label,value}));
@@ -487,7 +531,7 @@ function closeMeeting(){
 }
 
 /* =======================================================
-   CSV (export/import) — ✅ import corrigé
+   CSV (export/import)
 ======================================================= */
 async function exportCSV(){
   const items = await getAll();
@@ -530,10 +574,10 @@ async function importCSV(file){
 
   for(let i=1;i<lines.length;i++){
     const v=lines[i].split(";");
-    const action=(v[iAct]||"").trim();
+    const action=(iAct>=0 ? (v[iAct]||"") : "").trim();
     if(!action) continue;
 
-    const statut=(v[iSt]||"A faire").trim();
+    const statut=(iSt>=0 ? (v[iSt]||"A faire") : "A faire").trim();
     const now=Date.now();
 
     await saveItem({
@@ -621,3 +665,156 @@ async function render(){
   arch.forEach(it=>{
     const li=document.createElement("li");
     li.className="item archive-item";
+    const stamp=it.archivedAt?new Date(it.archivedAt).toLocaleDateString("fr-FR"):"";
+    li.innerHTML=`
+      <div class="done" title="Reprendre">↩︎</div>
+      <div class="main">
+        <div class="line">${esc(it.actionPrecise)}</div>
+        <div class="meta">${esc(it.famille||"")} • ${esc(it.categorie||"")}</div>
+        <div class="meta">Archivé le ${esc(stamp)}</div>
+      </div>
+      <div></div><div></div>
+    `;
+    li.querySelector(".done").addEventListener("click", async()=>{
+      await updateStatus(it.uid,"A faire");
+      switchTab("todo");
+      await render();
+    });
+    ua.appendChild(li);
+  });
+
+  if(!$("stats-section").hidden){
+    await renderStats(all);
+  }
+}
+
+/* =======================================================
+   BOOT
+======================================================= */
+document.addEventListener("DOMContentLoaded", async()=>{
+  refreshNetBanner();
+
+  // auth / user bar
+  CURRENT_USER = await getCurrentUser();
+
+  const authForm = $("auth-form");
+  const userBar = $("user-bar");
+  const userEmail = $("user-email");
+
+  if (CURRENT_USER && CURRENT_USER.email_confirmed_at) {
+    authForm.style.display = "none";
+    userBar.style.display = "block";
+    if(userEmail) userEmail.textContent = "Connecté : " + CURRENT_USER.email;
+  } else {
+    authForm.style.display = "block";
+    userBar.style.display = "none";
+  }
+
+  $("btn-login")?.addEventListener("click", ()=>login($("auth-email").value, $("auth-password").value));
+  $("btn-signup")?.addEventListener("click", ()=>signup($("auth-email").value, $("auth-password").value));
+  $("btn-logout")?.addEventListener("click", logout);
+
+  // menus
+  fillSelect("famille",FAMILLES,FAMILLES[0]);
+  fillSelect("categorie",CATEGORIES,"Moi-même");
+  fillSelect("statut",STATUTS,"A faire");
+
+  // tabs
+  $("tab-todo")?.addEventListener("click", async()=>{ switchTab("todo"); await render(); });
+  $("tab-archive")?.addEventListener("click", async()=>{ switchTab("archive"); await render(); });
+  $("tab-stats")?.addEventListener("click", async()=>{ switchTab("stats"); await render(); });
+
+  // meeting modal
+  $("meetingToggle")?.addEventListener("change", (e)=>{ if(e.target.checked) openMeeting(); });
+  $("closeMeeting")?.addEventListener("click", closeMeeting);
+  $("meetingCancel")?.addEventListener("click", closeMeeting);
+  $("meetingOverlay")?.addEventListener("click",(e)=>{ if(e.target===$("meetingOverlay")) closeMeeting(); });
+
+  $("meeting-form")?.addEventListener("submit", async(e)=>{
+    e.preventDefault();
+    const now = Date.now();
+    const meeting={
+      date:$("m_date").value,
+      time:$("m_time").value,
+      place:$("m_place").value.trim(),
+      people:$("m_people").value.trim(),
+      needs:$("m_needs").value.trim(),
+      minutes:$("m_minutes").value.trim()
+    };
+    const label=`Réunion ${meeting.date||""} ${meeting.time||""}`.trim();
+
+    await saveItem({
+      uid: makeUID(),
+      createdAt: now,
+      updatedAt: now,
+      actionPrecise: label || "Réunion",
+      famille: "Réunion",
+      categorie: "Moi-même",
+      nom: meeting.people || "",
+      tempsEstime: "",
+      tempsReel: "",
+      dateLimite: meeting.date || "",
+      statut: "A faire",
+      archivedAt: null,
+      isMeeting: true,
+      meeting
+    });
+
+    closeMeeting();
+    switchTab("todo");
+    await render();
+  });
+
+  // add-form
+  $("add-form")?.addEventListener("submit", async(e)=>{
+    e.preventDefault();
+    const now = Date.now();
+    const statut = $("statut").value;
+
+    await saveItem({
+      uid: makeUID(),
+      createdAt: now,
+      updatedAt: now,
+      actionPrecise: $("actionPrecise").value.trim(),
+      famille: $("famille").value,
+      categorie: $("categorie").value,
+      nom: $("nom").value.trim(),
+      tempsEstime: $("tempsEstime").value,
+      tempsReel: $("tempsReel").value,
+      dateLimite: $("dateLimite").value,
+      statut,
+      archivedAt: statut==="Terminé" ? now : null,
+      isMeeting: false,
+      meeting: null
+    });
+
+    $("add-form").reset();
+    fillSelect("statut",STATUTS,"A faire");
+    fillSelect("categorie",CATEGORIES,"Moi-même");
+    if ($("meetingToggle")) $("meetingToggle").checked=false;
+    await render();
+  });
+
+  $("reset-btn")?.addEventListener("click", ()=>$("add-form").reset());
+  $("statsRefresh")?.addEventListener("click", async()=>renderStats(await getAll()));
+
+  $("export-btn")?.addEventListener("click", exportCSV);
+  $("import-btn")?.addEventListener("click", ()=>$("import-file").click());
+  $("import-file")?.addEventListener("change", async(e)=>{
+    const file=e.target.files?.[0];
+    if(!file) return;
+    await importCSV(file);
+    e.target.value="";
+    await render();
+  });
+
+  // load data + flush offline ops
+  try{
+    await flushQueue();
+    await fetchAllFromServer();
+  } catch {
+    SERVER_CACHE = loadLocalCache();
+  }
+
+  await render();
+});
