@@ -765,7 +765,11 @@ document.addEventListener("DOMContentLoaded", async()=>{
   // tabs
   $("tab-todo")?.addEventListener("click", async()=>{ switchTab("todo"); await render(); });
   $("tab-archive")?.addEventListener("click", async()=>{ switchTab("archive"); await render(); });
-  $("tab-stats")?.addEventListener("click", async()=>{ switchTab("stats"); await render(); });
+  $("tab-stats")?.addEventListener("click", async()=>{
+  switchTab("stats");
+  const all = await getAll();
+  await renderStats(all);
+});
 
   // meeting modal
   $("meetingToggle")?.addEventListener("change", (e)=>{ if(e.target.checked) openMeeting(); });
