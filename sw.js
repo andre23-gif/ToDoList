@@ -1,4 +1,4 @@
-const CACHE_NAME = "todo-pwa-v7"; // <-- incrémente v2, v3… à chaque mise à jour
+const CACHE_NAME = "todo-pwa-v8"; // <-- incrémente v2, v3… à chaque mise à jour
 
 const APP_SHELL = [
   "/ToDoList/",
