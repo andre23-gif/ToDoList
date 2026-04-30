@@ -725,10 +725,6 @@ async function render(){
     });
     ua.appendChild(li);
   });
-
-  if(!$("stats-section").hidden){
-    await renderStats(all);
-  }
 }
 
 /* =======================================================
